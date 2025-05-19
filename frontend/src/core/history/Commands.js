@@ -605,3 +605,499 @@ export class DeletePolygonCommand extends Command {
     }
   }
 }
+
+export class AddZoneCommand extends Command {
+  constructor(zoneTool, zone) {
+    super();
+    this.zoneTool = zoneTool;
+    this.zone = zone;
+    this.addedZoneIndex = null;
+  }
+  
+  execute() {
+    console.log('Executing AddZoneCommand for zone:', this.zone.id);
+    
+    // Add zone to the zones array
+    this.zoneTool.zones.push(this.zone);
+    this.addedZoneIndex = this.zoneTool.zones.length - 1;
+    
+    // Update renderer
+    if (this.zoneTool.zoneRenderer) {
+      this.zoneTool.zoneRenderer.render(
+        this.zoneTool.zones,
+        null,
+        this.zoneTool.mousePosition,
+        null
+      );
+    }
+  }
+  
+  undo() {
+    console.log('Undoing AddZoneCommand for zone:', this.zone.id);
+    
+    if (this.addedZoneIndex !== null) {
+      // Remove the zone from the array
+      this.zoneTool.zones.splice(this.addedZoneIndex, 1);
+      
+      // Update renderer
+      if (this.zoneTool.zoneRenderer) {
+        this.zoneTool.zoneRenderer.render(
+          this.zoneTool.zones,
+          null,
+          this.zoneTool.mousePosition,
+          null
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Command for modifying a zone's point
+ */
+export class ModifyZoneCommand extends Command {
+  constructor(selectTool, zone, pointIndex, oldPoint, newPoint) {
+    super();
+    this.selectTool = selectTool;
+    this.zone = zone;
+    this.pointIndex = pointIndex;
+    this.oldPoint = oldPoint;
+    this.newPoint = newPoint;
+  }
+  
+  execute() {
+    console.log(`Executing ModifyZoneCommand: point ${this.pointIndex} from (${this.oldPoint.x}, ${this.oldPoint.y}) to (${this.newPoint.x}, ${this.newPoint.y})`);
+    
+    // Update the point
+    this.zone.updatePoint(this.pointIndex, this.newPoint);
+    
+    // Update renderer
+    this.updateRenderers();
+  }
+  
+  undo() {
+    console.log(`Undoing ModifyZoneCommand: point ${this.pointIndex} from (${this.newPoint.x}, ${this.newPoint.y}) to (${this.oldPoint.x}, ${this.oldPoint.y})`);
+    
+    // Restore the point
+    this.zone.updatePoint(this.pointIndex, this.oldPoint);
+    
+    // Update renderer
+    this.updateRenderers();
+  }
+  
+  updateRenderers() {
+    if (this.selectTool.zoneRenderer) {
+      this.selectTool.zoneRenderer.render(
+        this.selectTool.zones,
+        null,
+        this.selectTool.lastMousePosition,
+        this.zone
+      );
+    }
+  }
+}
+
+/**
+ * Command for deleting a zone
+ */
+export class DeleteZoneCommand extends Command {
+  constructor(selectTool, zone) {
+    super();
+    this.selectTool = selectTool;
+    this.zone = zone;
+    this.zoneIndex = null;
+  }
+  
+  execute() {
+    console.log('Executing DeleteZoneCommand for zone:', this.zone.id);
+    
+    // Find the zone's index in the zones array
+    this.zoneIndex = this.selectTool.zones.findIndex(z => z.id === this.zone.id);
+    
+    if (this.zoneIndex !== -1) {
+      // Remove the zone from the array
+      this.selectTool.zones.splice(this.zoneIndex, 1);
+      
+      // Clear selection
+      this.selectTool.clearSelection();
+      
+      // Update renderer
+      this.updateRenderers();
+    }
+  }
+  
+  undo() {
+    console.log('Undoing DeleteZoneCommand for zone:', this.zone.id);
+    
+    if (this.zoneIndex !== null && this.zoneIndex !== -1) {
+      // Add the zone back to the array at the same index
+      this.selectTool.zones.splice(this.zoneIndex, 0, this.zone);
+      
+      // Re-select the zone
+      this.selectTool.selectObject(this.zone);
+      
+      // Update renderer
+      this.updateRenderers();
+    }
+  }
+  
+  updateRenderers() {
+    if (this.selectTool.zoneRenderer) {
+      this.selectTool.zoneRenderer.render(
+        this.selectTool.zones,
+        null,
+        this.selectTool.lastMousePosition,
+        this.selectTool.selectedObject ? this.selectTool.selectedObject.object : null
+      );
+    }
+  }
+}
+
+/**
+ * Command for adding a zone divider
+ */
+export class AddZoneDividerCommand extends Command {
+  constructor(zoneDividerTool, divider) {
+    super();
+    this.zoneDividerTool = zoneDividerTool;
+    this.divider = divider;
+    this.addedDividerIndex = null;
+  }
+  
+  execute() {
+    console.log('Executing AddZoneDividerCommand for divider:', this.divider.id);
+    
+    // Add divider to the dividers array
+    this.zoneDividerTool.dividers.push(this.divider);
+    this.addedDividerIndex = this.zoneDividerTool.dividers.length - 1;
+    
+    // Update renderer
+    if (this.zoneDividerTool.zoneDividerRenderer) {
+      this.zoneDividerTool.zoneDividerRenderer.render(
+        this.zoneDividerTool.dividers,
+        null,
+        this.zoneDividerTool.mousePosition,
+        null
+      );
+    }
+  }
+  
+  undo() {
+    console.log('Undoing AddZoneDividerCommand for divider:', this.divider.id);
+    
+    if (this.addedDividerIndex !== null) {
+      // Remove the divider from the array
+      this.zoneDividerTool.dividers.splice(this.addedDividerIndex, 1);
+      
+      // Update renderer
+      if (this.zoneDividerTool.zoneDividerRenderer) {
+        this.zoneDividerTool.zoneDividerRenderer.render(
+          this.zoneDividerTool.dividers,
+          null,
+          this.zoneDividerTool.mousePosition,
+          null
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Command for modifying a zone divider
+ */
+export class ModifyZoneDividerCommand extends Command {
+  constructor(selectTool, divider, property, oldValue, newValue) {
+    super();
+    this.selectTool = selectTool;
+    this.divider = divider;
+    this.property = property;
+    this.oldValue = oldValue;
+    this.newValue = newValue;
+  }
+  
+  execute() {
+    console.log(`Executing ModifyZoneDividerCommand: ${this.property}`);
+    
+    // Apply the change based on property type
+    if (this.property === 'position') {
+      // Position modification is special - it contains start and end points
+      this.divider.updatePosition(
+        this.newValue.start,
+        this.newValue.end
+      );
+    } else {
+      // Simple property update
+      this.divider[this.property] = this.newValue;
+    }
+    
+    // Update renderer
+    this.updateRenderers();
+  }
+  
+  undo() {
+    console.log(`Undoing ModifyZoneDividerCommand: ${this.property}`);
+    
+    // Restore the original value based on property type
+    if (this.property === 'position') {
+      // Position modification is special - it contains start and end points
+      this.divider.updatePosition(
+        this.oldValue.start,
+        this.oldValue.end
+      );
+    } else {
+      // Simple property update
+      this.divider[this.property] = this.oldValue;
+    }
+    
+    // Update renderer
+    this.updateRenderers();
+  }
+  
+  updateRenderers() {
+    if (this.selectTool.zoneDividerRenderer) {
+      this.selectTool.zoneDividerRenderer.render(
+        this.selectTool.dividers,
+        null,
+        this.selectTool.lastMousePosition,
+        this.divider
+      );
+    }
+  }
+}
+
+export class DeleteZoneDividerCommand extends Command {
+  constructor(selectTool, divider) {
+    super();
+    this.selectTool = selectTool;
+    this.divider = divider;
+    this.dividerIndex = null;
+  }
+  
+  execute() {
+    console.log('Executing DeleteZoneDividerCommand for divider:', this.divider.id);
+    
+    // Find the divider's index in the dividers array
+    this.dividerIndex = this.selectTool.dividers.findIndex(d => d.id === this.divider.id);
+    
+    if (this.dividerIndex !== -1) {
+      // Remove the divider from the array
+      this.selectTool.dividers.splice(this.dividerIndex, 1);
+      
+      // Clear selection
+      this.selectTool.clearSelection();
+      
+      // Update renderer
+      this.updateRenderers();
+    }
+  }
+  
+  undo() {
+    console.log('Undoing DeleteZoneDividerCommand for divider:', this.divider.id);
+    
+    if (this.dividerIndex !== null && this.dividerIndex !== -1) {
+      // Add the divider back to the array at the same index
+      this.selectTool.dividers.splice(this.dividerIndex, 0, this.divider);
+      
+      // Re-select the divider
+      this.selectTool.selectObject(this.divider);
+      
+      // Update renderer
+      this.updateRenderers();
+    }
+  }
+  
+  updateRenderers() {
+    if (this.selectTool.zoneDividerRenderer) {
+      this.selectTool.zoneDividerRenderer.render(
+        this.selectTool.dividers,
+        null,
+        this.selectTool.lastMousePosition,
+        this.selectTool.selectedObject ? this.selectTool.selectedObject.object : null
+      );
+    }
+  }
+}
+
+/**
+ * Command for adding an arc
+ */
+export class AddArcCommand extends Command {
+  constructor(arcTool, arc) {
+    super();
+    this.arcTool = arcTool;
+    this.arc = arc;
+    this.addedArcIndex = null;
+  }
+  
+  execute() {
+    console.log('Executing AddArcCommand for arc:', this.arc.id);
+    
+    // Add arc to the arcs array
+    this.arcTool.arcs.push(this.arc);
+    this.addedArcIndex = this.arcTool.arcs.length - 1;
+    
+    // Update renderer
+    if (this.arcTool.arcRenderer) {
+      this.arcTool.arcRenderer.render(
+        this.arcTool.arcs,
+        null,
+        this.arcTool.mousePosition,
+        null
+      );
+    }
+  }
+  
+  undo() {
+    console.log('Undoing AddArcCommand for arc:', this.arc.id);
+    
+    if (this.addedArcIndex !== null) {
+      // Remove the arc from the array
+      this.arcTool.arcs.splice(this.addedArcIndex, 1);
+      
+      // Update renderer
+      if (this.arcTool.arcRenderer) {
+        this.arcTool.arcRenderer.render(
+          this.arcTool.arcs,
+          null,
+          this.arcTool.mousePosition,
+          null
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Command for modifying an arc
+ */
+export class ModifyArcCommand extends Command {
+  constructor(selectTool, arc, property, oldValue, newValue) {
+    super();
+    this.selectTool = selectTool;
+    this.arc = arc;
+    this.property = property;
+    this.oldValue = oldValue;
+    this.newValue = newValue;
+  }
+  
+  execute() {
+    console.log(`Executing ModifyArcCommand: ${this.property}`);
+    
+    // Apply the change based on property type
+    switch (this.property) {
+      case 'center':
+        this.arc.updateCenter(this.newValue);
+        break;
+      case 'radius':
+        this.arc.updateRadius(this.newValue);
+        break;
+      case 'angles':
+        this.arc.updateAngles(
+          this.newValue.startAngle,
+          this.newValue.endAngle
+        );
+        break;
+      default:
+        // Simple property update
+        this.arc[this.property] = this.newValue;
+        break;
+    }
+    
+    // Update renderer
+    this.updateRenderers();
+  }
+  
+  undo() {
+    console.log(`Undoing ModifyArcCommand: ${this.property}`);
+    
+    // Restore the original value based on property type
+    switch (this.property) {
+      case 'center':
+        this.arc.updateCenter(this.oldValue);
+        break;
+      case 'radius':
+        this.arc.updateRadius(this.oldValue);
+        break;
+      case 'angles':
+        this.arc.updateAngles(
+          this.oldValue.startAngle,
+          this.oldValue.endAngle
+        );
+        break;
+      default:
+        // Simple property update
+        this.arc[this.property] = this.oldValue;
+        break;
+    }
+    
+    // Update renderer
+    this.updateRenderers();
+  }
+  
+  updateRenderers() {
+    if (this.selectTool.arcRenderer) {
+      this.selectTool.arcRenderer.render(
+        this.selectTool.arcs,
+        null,
+        this.selectTool.lastMousePosition,
+        this.arc
+      );
+    }
+  }
+}
+
+/**
+ * Command for deleting an arc
+ */
+export class DeleteArcCommand extends Command {
+  constructor(selectTool, arc) {
+    super();
+    this.selectTool = selectTool;
+    this.arc = arc;
+    this.arcIndex = null;
+  }
+  
+  execute() {
+    console.log('Executing DeleteArcCommand for arc:', this.arc.id);
+    
+    // Find the arc's index in the arcs array
+    this.arcIndex = this.selectTool.arcs.findIndex(a => a.id === this.arc.id);
+    
+    if (this.arcIndex !== -1) {
+      // Remove the arc from the array
+      this.selectTool.arcs.splice(this.arcIndex, 1);
+      
+      // Clear selection
+      this.selectTool.clearSelection();
+      
+      // Update renderer
+      this.updateRenderers();
+    }
+  }
+  
+  undo() {
+    console.log('Undoing DeleteArcCommand for arc:', this.arc.id);
+    
+    if (this.arcIndex !== null && this.arcIndex !== -1) {
+      // Add the arc back to the array at the same index
+      this.selectTool.arcs.splice(this.arcIndex, 0, this.arc);
+      
+      // Re-select the arc
+      this.selectTool.selectObject(this.arc);
+      
+      // Update renderer
+      this.updateRenderers();
+    }
+  }
+  
+  updateRenderers() {
+    if (this.selectTool.arcRenderer) {
+      this.selectTool.arcRenderer.render(
+        this.selectTool.arcs,
+        null,
+        this.selectTool.lastMousePosition,
+        this.selectTool.selectedObject ? this.selectTool.selectedObject.object : null
+      );
+    }
+  }
+}
