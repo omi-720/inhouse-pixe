@@ -579,33 +579,51 @@
 // };
 
 // export default Canvas;
-
-// src/components/Canvas.jsx - Update with circle and polygon tools
 import React, { useEffect, useRef, useState } from "react";
 import PixiRenderer from "../core/engine/PixiRenderer";
 import SceneManager from "../core/engine/SceneManager";
+
+// Import all tools
 import WallTool from "../tools/WallTool";
 import SelectTool from "../tools/SelectTool";
 import CircleTool from "../tools/CircleTool";
 import PolygonTool from "../tools/PolygonTool";
 import CircleSelectTool from "../tools/CircleSelectTool";
 import PolygonSelectTool from "../tools/PolygonSelectTool";
+import ZoneTool from "../tools/ZoneTool";
+import ZoneSelectTool from "../tools/ZoneSelectTool";
+import ZoneDividerTool from "../tools/ZoneDividerTool";
+import ZoneDividerSelectTool from "../tools/ZoneDividerSelectTool";
+import ArcTool from "../tools/ArcTool";
+import ArcSelectTool from "../tools/ArcSelectTool";
+
+// Import all renderers
 import WallRenderer from "../renderers/WallRenderer";
 import CircleRenderer from "../renderers/CircleRenderer";
 import PolygonRenderer from "../renderers/PolygonRenderer";
+import ZoneRenderer from "../renderers/ZoneRenderer";
+import ZoneDividerRenderer from "../renderers/ZoneDividerRenderer";
+import ArcRenderer from "../renderers/ArcRenderer";
+
+// Import toolbars and sidebars for different types
 import Toolbar from "./Toolbar";
 import Sidebar from "./Sidebar";
 import CircleSidebar from "./CircleSidebar";
 import PolygonSidebar from "./PolygonSidebar";
+
+// Import settings panels
 import WallToolSettings from "./WallToolSettings";
 import CircleToolSettings from "./CircleToolSettings";
 import PolygonToolSettings from "./PolygonToolSettings";
+
+// Import constants and utilities
 import { PIXELS_PER_METER } from "../core/geometry/MeasurementUtils";
 import WallOutlineRenderer from "../renderers/WallOutlineRenderer";
 import HistoryManager from "../core/history/HistoryManager";
 import ToolManager from "../tools/ToolManager";
 
 const Canvas = () => {
+  // Base references
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
   const sceneManagerRef = useRef(null);
@@ -616,16 +634,26 @@ const Canvas = () => {
   const wallToolRef = useRef(null);
   const selectToolRef = useRef(null);
   const circleToolRef = useRef(null);
-  const polygonToolRef = useRef(null);
   const circleSelectToolRef = useRef(null);
+  const polygonToolRef = useRef(null);
   const polygonSelectToolRef = useRef(null);
+  const zoneToolRef = useRef(null);
+  const zoneSelectToolRef = useRef(null);
+  const zoneDividerToolRef = useRef(null);
+  const zoneDividerSelectToolRef = useRef(null);
+  const arcToolRef = useRef(null);
+  const arcSelectToolRef = useRef(null);
 
   // Renderer references
   const wallRendererRef = useRef(null);
   const wallOutlineRendererRef = useRef(null);
   const circleRendererRef = useRef(null);
   const polygonRendererRef = useRef(null);
+  const zoneRendererRef = useRef(null);
+  const zoneDividerRendererRef = useRef(null);
+  const arcRendererRef = useRef(null);
 
+  // UI state
   const [zoomLevel, setZoomLevel] = useState(1);
   const [currentTool, setCurrentTool] = useState("wall");
   const [selectedObject, setSelectedObject] = useState(null);
@@ -635,12 +663,14 @@ const Canvas = () => {
     meters: 1,
   });
   const [isInitialized, setIsInitialized] = useState(false);
-  const [showFPS, setShowFPS] = useState(true); // Set to true to show by default
+  const [showFPS, setShowFPS] = useState(true);
   const [fps, setFps] = useState(0);
 
-  // State for circle and polygon settings
+  // Tool settings state
   const [showCircleMeasurements, setShowCircleMeasurements] = useState(true);
   const [showPolygonMeasurements, setShowPolygonMeasurements] = useState(true);
+  const [showZoneMeasurements, setShowZoneMeasurements] = useState(true);
+  const [zoneDividerThickness, setZoneDividerThickness] = useState(0.05); // 5cm default
 
   // Initialize PixiJS and tools
   useEffect(() => {
@@ -668,20 +698,92 @@ const Canvas = () => {
           historyManagerRef.current = new HistoryManager();
         }
 
-        // Initialize renderers
+        // Initialize renderers in the correct order (bottom to top layers)
+
+        // 1. Zone renderer (bottom layer)
+        const zoneRenderer = new ZoneRenderer(renderer);
+        zoneRendererRef.current = zoneRenderer;
+
+        // 2. Zone divider renderer
+        const zoneDividerRenderer = new ZoneDividerRenderer(renderer);
+        zoneDividerRendererRef.current = zoneDividerRenderer;
+
+        // 3. Wall renderer
         const wallRenderer = new WallRenderer(renderer);
         wallRendererRef.current = wallRenderer;
 
         const wallOutlineRenderer = new WallOutlineRenderer(renderer);
         wallOutlineRendererRef.current = wallOutlineRenderer;
 
+        // 4. Circle renderer
         const circleRenderer = new CircleRenderer(renderer);
         circleRendererRef.current = circleRenderer;
 
+        // 5. Polygon renderer
         const polygonRenderer = new PolygonRenderer(renderer);
         polygonRendererRef.current = polygonRenderer;
 
-        // Initialize tools with all the renderers
+        // 6. Arc renderer
+        const arcRenderer = new ArcRenderer(renderer);
+        arcRendererRef.current = arcRenderer;
+
+        // Initialize all tools with their renderers
+
+        // 1. Zone tools
+        const zoneTool = new ZoneTool(
+          renderer,
+          zoneRenderer,
+          historyManagerRef.current
+        );
+        zoneTool.onZoneAdded = () => {
+          renderZones();
+        };
+        zoneToolRef.current = zoneTool;
+
+        const zoneSelectTool = new ZoneSelectTool(
+          renderer,
+          zoneRenderer,
+          zoneTool.zones,
+          historyManagerRef.current
+        );
+        zoneSelectTool.setOnSelectionChange((obj) => {
+          if (obj && obj.type === "zone") {
+            setSelectedObject(obj);
+          } else if (!obj) {
+            setSelectedObject(null);
+          }
+        });
+        zoneSelectToolRef.current = zoneSelectTool;
+
+        // 2. Zone divider tools
+        const zoneDividerTool = new ZoneDividerTool(
+          renderer,
+          zoneDividerRenderer,
+          zoneTool, // Pass zone tool reference for boundary snapping
+          historyManagerRef.current
+        );
+        zoneDividerTool.setDefaultThickness(zoneDividerThickness);
+        zoneDividerTool.onDividerAdded = () => {
+          renderZoneDividers();
+        };
+        zoneDividerToolRef.current = zoneDividerTool;
+
+        const zoneDividerSelectTool = new ZoneDividerSelectTool(
+          renderer,
+          zoneDividerRenderer,
+          zoneDividerTool.dividers,
+          historyManagerRef.current
+        );
+        zoneDividerSelectTool.setOnSelectionChange((obj) => {
+          if (obj && obj.type === "zoneDivider") {
+            setSelectedObject(obj);
+          } else if (!obj) {
+            setSelectedObject(null);
+          }
+        });
+        zoneDividerSelectToolRef.current = zoneDividerSelectTool;
+
+        // 3. Wall tools
         const wallTool = new WallTool(
           renderer,
           wallRenderer,
@@ -690,32 +792,10 @@ const Canvas = () => {
         wallTool.setDefaultThickness(defaultThickness);
         wallTool.outlineRenderer = wallOutlineRenderer;
         wallTool.onWallAdded = () => {
-          // Simple direct rendering - no force update needed
           renderWalls();
         };
         wallToolRef.current = wallTool;
 
-        const circleTool = new CircleTool(
-          renderer,
-          circleRenderer,
-          historyManagerRef.current
-        );
-        circleTool.onCircleAdded = () => {
-          renderCircles();
-        };
-        circleToolRef.current = circleTool;
-
-        const polygonTool = new PolygonTool(
-          renderer,
-          polygonRenderer,
-          historyManagerRef.current
-        );
-        polygonTool.onPolygonAdded = () => {
-          renderPolygons();
-        };
-        polygonToolRef.current = polygonTool;
-
-        // Initialize selection tools
         const selectTool = new SelectTool(
           renderer,
           wallRenderer,
@@ -732,6 +812,17 @@ const Canvas = () => {
         });
         selectToolRef.current = selectTool;
 
+        // 4. Circle tools
+        const circleTool = new CircleTool(
+          renderer,
+          circleRenderer,
+          historyManagerRef.current
+        );
+        circleTool.onCircleAdded = () => {
+          renderCircles();
+        };
+        circleToolRef.current = circleTool;
+
         const circleSelectTool = new CircleSelectTool(
           renderer,
           circleRenderer,
@@ -746,6 +837,17 @@ const Canvas = () => {
           }
         });
         circleSelectToolRef.current = circleSelectTool;
+
+        // 5. Polygon tools
+        const polygonTool = new PolygonTool(
+          renderer,
+          polygonRenderer,
+          historyManagerRef.current
+        );
+        polygonTool.onPolygonAdded = () => {
+          renderPolygons();
+        };
+        polygonToolRef.current = polygonTool;
 
         const polygonSelectTool = new PolygonSelectTool(
           renderer,
@@ -762,16 +864,51 @@ const Canvas = () => {
         });
         polygonSelectToolRef.current = polygonSelectTool;
 
+        // 6. Arc tools
+        const arcTool = new ArcTool(
+          renderer,
+          arcRenderer,
+          historyManagerRef.current
+        );
+        arcTool.onArcAdded = () => {
+          renderArcs();
+        };
+        arcToolRef.current = arcTool;
+
+        const arcSelectTool = new ArcSelectTool(
+          renderer,
+          arcRenderer,
+          arcTool.arcs,
+          historyManagerRef.current
+        );
+        arcSelectTool.setOnSelectionChange((obj) => {
+          if (obj && obj.type === "arc") {
+            setSelectedObject(obj);
+          } else if (!obj) {
+            setSelectedObject(null);
+          }
+        });
+        arcSelectToolRef.current = arcSelectTool;
+
         // Initialize the tool manager
         toolManagerRef.current = new ToolManager();
 
-        // Register tools
+        // Register all tools
         toolManagerRef.current.registerTool("wall", wallTool);
         toolManagerRef.current.registerTool("select", selectTool);
         toolManagerRef.current.registerTool("circle", circleTool);
-        toolManagerRef.current.registerTool("polygon", polygonTool);
         toolManagerRef.current.registerTool("circleSelect", circleSelectTool);
+        toolManagerRef.current.registerTool("polygon", polygonTool);
         toolManagerRef.current.registerTool("polygonSelect", polygonSelectTool);
+        toolManagerRef.current.registerTool("zone", zoneTool);
+        toolManagerRef.current.registerTool("zoneSelect", zoneSelectTool);
+        toolManagerRef.current.registerTool("zoneDivider", zoneDividerTool);
+        toolManagerRef.current.registerTool(
+          "zoneDividerSelect",
+          zoneDividerSelectTool
+        );
+        toolManagerRef.current.registerTool("arc", arcTool);
+        toolManagerRef.current.registerTool("arcSelect", arcSelectTool);
 
         // Activate initial tool
         toolManagerRef.current.activateTool(currentTool);
@@ -837,6 +974,21 @@ const Canvas = () => {
           polygonRendererRef.current.destroy();
           polygonRendererRef.current = null;
         }
+
+        if (zoneRendererRef.current) {
+          zoneRendererRef.current.destroy();
+          zoneRendererRef.current = null;
+        }
+
+        if (zoneDividerRendererRef.current) {
+          zoneDividerRendererRef.current.destroy();
+          zoneDividerRendererRef.current = null;
+        }
+
+        if (arcRendererRef.current) {
+          arcRendererRef.current.destroy();
+          arcRendererRef.current = null;
+        }
       };
     });
   }, []);
@@ -844,6 +996,13 @@ const Canvas = () => {
   useEffect(() => {
     const handleGlobalKeydown = (e) => {
       console.log("Global keydown:", e.key, e.ctrlKey);
+
+      // Handle undo/redo keyboard shortcuts
+      if (e.ctrlKey && e.key === "z" && historyManagerRef.current) {
+        historyManagerRef.current.undo();
+      } else if (e.ctrlKey && e.key === "y" && historyManagerRef.current) {
+        historyManagerRef.current.redo();
+      }
     };
 
     document.addEventListener("keydown", handleGlobalKeydown);
@@ -882,30 +1041,9 @@ const Canvas = () => {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Delete key to delete selected object
+      // Delete key to delete selected object - handled by each select tool
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (
-          currentTool === "select" &&
-          selectToolRef.current &&
-          selectToolRef.current.selectedObject
-        ) {
-          e.preventDefault();
-          selectToolRef.current.deleteSelectedWall();
-        } else if (
-          currentTool === "select" &&
-          circleSelectToolRef.current &&
-          circleSelectToolRef.current.selectedObject
-        ) {
-          e.preventDefault();
-          circleSelectToolRef.current.deleteSelectedCircle();
-        } else if (
-          currentTool === "select" &&
-          polygonSelectToolRef.current &&
-          polygonSelectToolRef.current.selectedObject
-        ) {
-          e.preventDefault();
-          polygonSelectToolRef.current.deleteSelectedPolygon();
-        }
+        // Each tool already has its own handler for this
       }
     };
 
@@ -918,36 +1056,42 @@ const Canvas = () => {
 
   // Update active tool when currentTool changes
   useEffect(() => {
-    if (toolManagerRef.current && currentTool) {
-      // If currentTool is 'select', decide which select tool to activate based on the type of selected object
+    if (toolManagerRef.current && currentTool && isInitialized) {
       if (currentTool === "select") {
-        // First deactivate all tools
-        for (const toolName of ["select", "circleSelect", "polygonSelect"]) {
+        // First deactivate all select tools
+        const selectTools = [
+          "select",
+          "circleSelect",
+          "polygonSelect",
+          "zoneSelect",
+          "zoneDividerSelect",
+          "arcSelect",
+        ];
+        for (const toolName of selectTools) {
           if (toolManagerRef.current.tools[toolName]) {
             toolManagerRef.current.tools[toolName].deactivate();
           }
         }
 
-        // Make sure selection tools have current data
+        // Ensure selection tools have current data
         updateSelectionToolsData();
 
-        // Activate all select tools
-        if (toolManagerRef.current.tools.select) {
-          toolManagerRef.current.tools.select.activate();
-        }
-        if (toolManagerRef.current.tools.circleSelect) {
-          toolManagerRef.current.tools.circleSelect.activate();
-        }
-        if (toolManagerRef.current.tools.polygonSelect) {
-          toolManagerRef.current.tools.polygonSelect.activate();
+        // Activate all select tools so they can handle their respective objects
+        for (const toolName of selectTools) {
+          if (toolManagerRef.current.tools[toolName]) {
+            toolManagerRef.current.tools[toolName].activate();
+          }
         }
       } else {
         // For non-select tools, activate normally
         toolManagerRef.current.activateTool(currentTool);
 
-        // Clear selection
+        // Clear selection when changing tools
         setSelectedObject(null);
       }
+
+      // Update all renderers
+      renderAll();
     }
   }, [currentTool, isInitialized]);
 
@@ -956,20 +1100,29 @@ const Canvas = () => {
     if (selectToolRef.current && wallToolRef.current) {
       selectToolRef.current.setWalls(wallToolRef.current.walls);
     }
+
     if (circleSelectToolRef.current && circleToolRef.current) {
       circleSelectToolRef.current.setCircles(circleToolRef.current.circles);
     }
+
     if (polygonSelectToolRef.current && polygonToolRef.current) {
       polygonSelectToolRef.current.setPolygons(polygonToolRef.current.polygons);
     }
-  };
 
-  // Make sure select tool has updated walls when they change
-  useEffect(() => {
-    if (selectToolRef.current && wallToolRef.current) {
-      selectToolRef.current.setWalls(wallToolRef.current.walls);
+    if (zoneSelectToolRef.current && zoneToolRef.current) {
+      zoneSelectToolRef.current.setZones(zoneToolRef.current.zones);
     }
-  }, [wallToolRef.current?.walls?.length]);
+
+    if (zoneDividerSelectToolRef.current && zoneDividerToolRef.current) {
+      zoneDividerSelectToolRef.current.setDividers(
+        zoneDividerToolRef.current.dividers
+      );
+    }
+
+    if (arcSelectToolRef.current && arcToolRef.current) {
+      arcSelectToolRef.current.setArcs(arcToolRef.current.arcs);
+    }
+  };
 
   // Add a useEffect to measure FPS
   useEffect(() => {
@@ -1002,7 +1155,7 @@ const Canvas = () => {
     };
   }, [showFPS]);
 
-  // Handle default thickness change
+  // Handler for wall thickness change
   const handleDefaultThicknessChange = (thickness) => {
     setDefaultThickness(thickness);
     if (wallToolRef.current) {
@@ -1028,42 +1181,71 @@ const Canvas = () => {
   const handlePropertyEdit = (property, value, objectId) => {
     if (!selectedObject) return;
 
-    if (selectedObject.type === "wall" && selectToolRef.current) {
-      selectToolRef.current.updateSelectedObject(property, value);
-    } else if (
-      selectedObject.type === "circle" &&
-      circleSelectToolRef.current
-    ) {
-      circleSelectToolRef.current.updateSelectedObject(property, value);
-    } else if (
-      selectedObject.type === "polygon" &&
-      polygonSelectToolRef.current
-    ) {
-      polygonSelectToolRef.current.updateSelectedObject(property, value);
+    // Call the appropriate update method based on selection type
+    switch (selectedObject.type) {
+      case "wall":
+        if (selectToolRef.current) {
+          selectToolRef.current.updateSelectedObject(property, value);
+        }
+        break;
+      case "circle":
+        if (circleSelectToolRef.current) {
+          circleSelectToolRef.current.updateSelectedObject(property, value);
+        }
+        break;
+      case "polygon":
+        if (polygonSelectToolRef.current) {
+          polygonSelectToolRef.current.updateSelectedObject(property, value);
+        }
+        break;
+      case "zone":
+        if (zoneSelectToolRef.current) {
+          zoneSelectToolRef.current.updateSelectedObject(property, value);
+        }
+        break;
+      case "zoneDivider":
+        if (zoneDividerSelectToolRef.current) {
+          zoneDividerSelectToolRef.current.updateSelectedObject(
+            property,
+            value
+          );
+        }
+        break;
+      case "arc":
+        if (arcSelectToolRef.current) {
+          arcSelectToolRef.current.updateSelectedObject(property, value);
+        }
+        break;
     }
   };
 
   // Circle measurements toggle handler
   const handleCircleMeasurementsToggle = (show) => {
     setShowCircleMeasurements(show);
-    // Update renderer to show/hide measurements
-    if (circleRendererRef.current) {
-      // Implementation would depend on your renderer design
-      renderCircles();
-    }
+    renderCircles();
   };
 
   // Polygon measurements toggle handler
   const handlePolygonMeasurementsToggle = (show) => {
     setShowPolygonMeasurements(show);
-    // Update renderer to show/hide measurements
-    if (polygonRendererRef.current) {
-      // Implementation would depend on your renderer design
-      renderPolygons();
+    renderPolygons();
+  };
+
+  // Zone measurements toggle handler
+  const handleZoneMeasurementsToggle = (show) => {
+    setShowZoneMeasurements(show);
+    renderZones();
+  };
+
+  // Zone divider thickness handler
+  const handleZoneDividerThicknessChange = (thickness) => {
+    setZoneDividerThickness(thickness);
+    if (zoneDividerToolRef.current) {
+      zoneDividerToolRef.current.setDefaultThickness(thickness);
     }
   };
 
-  // This function will render the walls with appropriate settings
+  // Render functions for each object type
   const renderWalls = () => {
     if (wallRendererRef.current && wallToolRef.current) {
       const walls = wallToolRef.current.walls;
@@ -1080,13 +1262,12 @@ const Canvas = () => {
         currentTool === "select"
       ) {
         selectedWall = selectedObject.object;
-        // Get connected walls from selection object if available
         connectedWalls = selectedObject.connectedWalls || [];
       }
 
       const mousePosition = wallToolRef.current.mousePosition;
 
-      // Pass connected walls to render method
+      // Render walls
       wallRendererRef.current.render(
         walls,
         nodes,
@@ -1094,19 +1275,19 @@ const Canvas = () => {
         selectedWall,
         mousePosition,
         true, // Skip outlines parameter
-        connectedWalls // New parameter for connected walls
+        connectedWalls
       );
 
       // Always render high-quality outlines
       if (wallOutlineRendererRef.current) {
         const allWalls = [...walls];
         if (currentWall) allWalls.push(currentWall);
+        wallOutlineRendererRef.current.invalidate(); // Force redraw
         wallOutlineRendererRef.current.render(allWalls, selectedWall);
       }
     }
   };
 
-  // This function will render the circles
   const renderCircles = () => {
     if (circleRendererRef.current && circleToolRef.current) {
       const circles = circleToolRef.current.circles;
@@ -1134,7 +1315,6 @@ const Canvas = () => {
     }
   };
 
-  // This function will render the polygons
   const renderPolygons = () => {
     if (polygonRendererRef.current && polygonToolRef.current) {
       const polygons = polygonToolRef.current.polygons;
@@ -1162,17 +1342,97 @@ const Canvas = () => {
     }
   };
 
+  const renderZones = () => {
+    if (zoneRendererRef.current && zoneToolRef.current) {
+      const zones = zoneToolRef.current.zones;
+      const currentZone = zoneToolRef.current.currentZone;
+
+      // Get selected zone if in select mode
+      let selectedZone = null;
+      if (
+        selectedObject &&
+        selectedObject.type === "zone" &&
+        currentTool === "select"
+      ) {
+        selectedZone = selectedObject.object;
+      }
+
+      const mousePosition = zoneToolRef.current.mousePosition;
+
+      // Render zones
+      zoneRendererRef.current.render(
+        zones,
+        currentZone,
+        mousePosition,
+        selectedZone
+      );
+    }
+  };
+
+  const renderZoneDividers = () => {
+    if (zoneDividerRendererRef.current && zoneDividerToolRef.current) {
+      const dividers = zoneDividerToolRef.current.dividers;
+      const currentDivider = zoneDividerToolRef.current.currentDivider;
+
+      // Get selected divider if in select mode
+      let selectedDivider = null;
+      if (
+        selectedObject &&
+        selectedObject.type === "zoneDivider" &&
+        currentTool === "select"
+      ) {
+        selectedDivider = selectedObject.object;
+      }
+
+      const mousePosition = zoneDividerToolRef.current.mousePosition;
+
+      // Render zone dividers
+      zoneDividerRendererRef.current.render(
+        dividers,
+        currentDivider,
+        mousePosition,
+        selectedDivider
+      );
+    }
+  };
+
+  const renderArcs = () => {
+    if (arcRendererRef.current && arcToolRef.current) {
+      const arcs = arcToolRef.current.arcs;
+      const currentArc = arcToolRef.current.currentArc;
+
+      // Get selected arc if in select mode
+      let selectedArc = null;
+      if (
+        selectedObject &&
+        selectedObject.type === "arc" &&
+        currentTool === "select"
+      ) {
+        selectedArc = selectedObject.object;
+      }
+
+      const mousePosition = arcToolRef.current.mousePosition;
+
+      // Render arcs
+      arcRendererRef.current.render(
+        arcs,
+        currentArc,
+        mousePosition,
+        selectedArc
+      );
+    }
+  };
+
   // Render all objects
   const renderAll = () => {
+    // Render in bottom-to-top layer order
+    renderZones();
+    renderZoneDividers();
     renderWalls();
     renderCircles();
     renderPolygons();
+    renderArcs();
   };
-
-  // Re-render everything when selection or tool changes
-  useEffect(() => {
-    renderAll();
-  }, [selectedObject, currentTool]);
 
   useEffect(() => {
     if (isInitialized) {
@@ -1247,6 +1507,165 @@ const Canvas = () => {
             onEdit={handlePropertyEdit}
           />
         );
+      case "zone":
+        // For now, use a simple dynamic sidebar for zones
+        return (
+          <div
+            style={{
+              position: "absolute",
+              top: "10px",
+              right: "10px",
+              width: "250px",
+              background: "rgba(255,255,255,0.85)",
+              padding: "15px",
+              borderRadius: "4px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "15px",
+              fontSize: "14px",
+            }}
+          >
+            <h3 style={{ margin: "0 0 5px 0", fontSize: "16px" }}>
+              Zone Properties
+            </h3>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Area:</span>
+                <span>{selectedObject.object.area.toFixed(2)} m²</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Perimeter:</span>
+                <span>{selectedObject.object.perimeter.toFixed(2)} m</span>
+              </div>
+            </div>
+          </div>
+        );
+      case "zoneDivider":
+        // Simple sidebar for zone dividers
+        return (
+          <div
+            style={{
+              position: "absolute",
+              top: "10px",
+              right: "10px",
+              width: "250px",
+              background: "rgba(255,255,255,0.85)",
+              padding: "15px",
+              borderRadius: "4px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "15px",
+              fontSize: "14px",
+            }}
+          >
+            <h3 style={{ margin: "0 0 5px 0", fontSize: "16px" }}>
+              Zone Divider Properties
+            </h3>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "5px" }}
+            >
+              <label>Thickness:</label>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <input
+                  type="number"
+                  min="0.01"
+                  max="0.5"
+                  step="0.01"
+                  value={selectedObject.object.thickness}
+                  onChange={(e) =>
+                    handlePropertyEdit("thickness", parseFloat(e.target.value))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "5px",
+                    border: "1px solid #ccc",
+                    borderRadius: "3px",
+                  }}
+                />
+                <span style={{ marginLeft: "5px" }}>m</span>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginTop: "5px",
+              }}
+            >
+              <input
+                type="checkbox"
+                id="isDashed"
+                checked={selectedObject.object.isDashed}
+                onChange={(e) =>
+                  handlePropertyEdit("isDashed", e.target.checked)
+                }
+                style={{ marginRight: "10px" }}
+              />
+              <label htmlFor="isDashed">Dashed Line</label>
+            </div>
+          </div>
+        );
+      case "arc":
+        // Simple sidebar for arcs
+        return (
+          <div
+            style={{
+              position: "absolute",
+              top: "10px",
+              right: "10px",
+              width: "250px",
+              background: "rgba(255,255,255,0.85)",
+              padding: "15px",
+              borderRadius: "4px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "15px",
+              fontSize: "14px",
+            }}
+          >
+            <h3 style={{ margin: "0 0 5px 0", fontSize: "16px" }}>
+              Arc Properties
+            </h3>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "5px" }}
+            >
+              <label>Radius:</label>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.1"
+                  value={selectedObject.object.radius}
+                  onChange={(e) =>
+                    handlePropertyEdit("radius", parseFloat(e.target.value))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "5px",
+                    border: "1px solid #ccc",
+                    borderRadius: "3px",
+                  }}
+                />
+                <span style={{ marginLeft: "5px" }}>m</span>
+              </div>
+            </div>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Arc Length:</span>
+                <span>
+                  {selectedObject.object.arcLength?.toFixed(2) || "0.00"} m
+                </span>
+              </div>
+            </div>
+          </div>
+        );
       default:
         return null;
     }
@@ -1276,6 +1695,148 @@ const Canvas = () => {
             onShowMeasurements={handlePolygonMeasurementsToggle}
           />
         );
+      case "zone":
+        return (
+          <div
+            style={{
+              position: "absolute",
+              top: "10px",
+              right: "10px",
+              width: "250px",
+              background: "rgba(255,255,255,0.85)",
+              padding: "15px",
+              borderRadius: "4px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+              fontSize: "14px",
+            }}
+          >
+            <h3 style={{ margin: "0 0 10px 0", fontSize: "16px" }}>
+              Zone Settings
+            </h3>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "5px" }}
+            >
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  id="showZoneMeasurements"
+                  checked={showZoneMeasurements}
+                  onChange={(e) =>
+                    handleZoneMeasurementsToggle(e.target.checked)
+                  }
+                  style={{ marginRight: "10px" }}
+                />
+                <label htmlFor="showZoneMeasurements">Show Measurements</label>
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: "15px",
+                fontSize: "12px",
+                color: "#666",
+              }}
+            >
+              Click to add zone points. Double-click or click the first point to
+              close the zone.
+            </div>
+          </div>
+        );
+      case "zoneDivider":
+        return (
+          <div
+            style={{
+              position: "absolute",
+              top: "10px",
+              right: "10px",
+              width: "250px",
+              background: "rgba(255,255,255,0.85)",
+              padding: "15px",
+              borderRadius: "4px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+              fontSize: "14px",
+            }}
+          >
+            <h3 style={{ margin: "0 0 10px 0", fontSize: "16px" }}>
+              Zone Divider Settings
+            </h3>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "5px" }}
+            >
+              <label>Divider Thickness:</label>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <input
+                  type="number"
+                  min="0.01"
+                  max="0.5"
+                  step="0.01"
+                  value={zoneDividerThickness}
+                  onChange={(e) =>
+                    handleZoneDividerThicknessChange(parseFloat(e.target.value))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "5px",
+                    border: "1px solid #ccc",
+                    borderRadius: "3px",
+                  }}
+                />
+                <span style={{ marginLeft: "5px" }}>m</span>
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: "15px",
+                fontSize: "12px",
+                color: "#666",
+              }}
+            >
+              Click within a zone or on a zone boundary to start drawing a
+              divider.
+            </div>
+          </div>
+        );
+      case "arc":
+        return (
+          <div
+            style={{
+              position: "absolute",
+              top: "10px",
+              right: "10px",
+              width: "250px",
+              background: "rgba(255,255,255,0.85)",
+              padding: "15px",
+              borderRadius: "4px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+              fontSize: "14px",
+            }}
+          >
+            <h3 style={{ margin: "0 0 10px 0", fontSize: "16px" }}>
+              Arc Settings
+            </h3>
+            <div
+              style={{
+                marginTop: "15px",
+                fontSize: "12px",
+                color: "#666",
+              }}
+            >
+              1. First click sets the center point.
+              <br />
+              2. Second click sets radius and start angle.
+              <br />
+              3. Third click sets the end angle and completes the arc.
+            </div>
+          </div>
+        );
       default:
         return null;
     }
@@ -1294,7 +1855,7 @@ const Canvas = () => {
         }}
       />
 
-      {/* Add the toolbar component */}
+      {/* Add the toolbar component with expanded tools */}
       <Toolbar currentTool={currentTool} onToolChange={handleToolChange} />
 
       {/* Show tool settings based on the current tool */}
@@ -1384,6 +1945,7 @@ const Canvas = () => {
         </div>
       </div>
 
+      {/* History control buttons */}
       <div
         style={{
           position: "absolute",
@@ -1394,7 +1956,7 @@ const Canvas = () => {
         }}
       >
         <button
-          onClick={() => historyManagerRef.current.undo()}
+          onClick={() => historyManagerRef.current?.undo()}
           title="Undo (Ctrl+Z)"
           style={{
             padding: "5px 10px",
@@ -1407,7 +1969,7 @@ const Canvas = () => {
           Undo
         </button>
         <button
-          onClick={() => historyManagerRef.current.redo()}
+          onClick={() => historyManagerRef.current?.redo()}
           title="Redo (Ctrl+Y)"
           style={{
             padding: "5px 10px",

@@ -59,7 +59,7 @@
 
 // export default Toolbar;
 
-// src/components/Toolbar.jsx - Updated with circle and polygon tools
+// src/components/Toolbar.jsx - Updated with all drawing tools
 import React from "react";
 
 const Toolbar = ({ currentTool, onToolChange }) => {
@@ -100,6 +100,24 @@ const Toolbar = ({ currentTool, onToolChange }) => {
         onClick={() => onToolChange("polygon")}
         icon="▢"
         label="Polygon"
+      />
+      <ToolButton
+        active={currentTool === "arc"}
+        onClick={() => onToolChange("arc")}
+        icon="⌓"
+        label="Arc"
+      />
+      <ToolButton
+        active={currentTool === "zone"}
+        onClick={() => onToolChange("zone")}
+        icon="▣"
+        label="Zone"
+      />
+      <ToolButton
+        active={currentTool === "zoneDivider"}
+        onClick={() => onToolChange("zoneDivider")}
+        icon="┃"
+        label="Divider"
       />
     </div>
   );
